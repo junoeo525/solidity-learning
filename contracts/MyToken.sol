@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 contract MyToken {
     event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Approval(address indexed spender, uint256 amount);
 
     string public name;
     string public symbol;
@@ -27,8 +27,24 @@ contract MyToken {
     }
 
     function approve(address spender, uint256 amount) external {
-        allowance[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
+        allowance[msg.sender] [spender] = amount;
+        emit Approval(spender, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external {
+        address spender = msg.sender;
+        require(allowance[from][spender] >= amount, "insufficient allowance");
+        allowance[from][spender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+    function _mint(uint256 amount, address owner) internal {
+        totalSupply += amount;
+        balanceOf[owner] += amount;
+        
+        emit Transfer(address(0), owner, amount);
     }
 
     function transfer(uint256 amount, address to) external {
@@ -38,25 +54,5 @@ contract MyToken {
         balanceOf[to] += amount;
 
         emit Transfer(msg.sender, to, amount);
-    }
-
-    function transferFrom(address from, address to, uint256 amount) external {
-        address spender = msg.sender;
-
-        require(allowance[from][spender] >= amount, "insufficient allowance");
-        require(balanceOf[from] >= amount, "insufficient balance");
-
-        allowance[from][spender] -= amount;
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-
-        emit Transfer(from, to, amount);
-    }
-
-    function _mint(uint256 amount, address owner) internal {
-        totalSupply += amount;
-        balanceOf[owner] += amount;
-
-        emit Transfer(address(0), owner, amount);
     }
 }
