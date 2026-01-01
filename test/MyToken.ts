@@ -1,15 +1,15 @@
-import hre from "hardhat";
+import hre, { ethers } from "hardhat";
 import { expect } from "chai";
 import { MyToken } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
+const mintingAmount = 100n;
 const decimals = 18n;
 
 describe("My Token", () => {
   let myTokenC: MyToken;
   let signers: HardhatEthersSigner[];
-
-  beforeEach(async () => {
+  beforeEach("should deploy", async () => {
     signers = await hre.ethers.getSigners();
     myTokenC = await hre.ethers.deployContract("MyToken", [
       "MyToken",
@@ -18,33 +18,85 @@ describe("My Token", () => {
       100,
     ]);
   });
+  describe("Basic state value check", () => {  
+  it("should return name", async () => {
+    expect(await myTokenC.name()).equal("MyToken");
+  });
 
-  describe("TransferFrom (approve & transferFrom)", () => {
-    it("signer1 moves signer0 token using approve & transferFrom and checks balances", async () => {
-      const signer0 = signers[0];
-      const signer1 = signers[1];
+  it("should return symbol", async () => {
+    expect(await myTokenC.symbol()).equal("MT");
+  });
 
-      const amount = hre.ethers.parseUnits("10", decimals); // 10 MT
+  it("should return decimals", async () => {
+    expect(await myTokenC.decimals()).equal(decimals);
+  });
 
-      // 1) approve: signer0가 signer1에게 권한 부여
-      await expect(myTokenC.approve(signer1.address, amount))
-        .to.emit(myTokenC, "Approval")
-        .withArgs(signer0.address, signer1.address, amount);
-
-      await expect(
-        myTokenC.connect(signer1).transferFrom(signer0.address, signer1.address, amount)
-      )
+  it("should return 100 totalSupply", async () => {
+    expect(await myTokenC.totalSupply()).equal(mintingAmount*10n**decimals);
+  });
+})
+  // 1MT = 1*10^18
+  describe("Mint", () => {
+  it("should return 1MT balance for signer 0", async () => {
+    const signer0 = signers[0];
+    expect(await myTokenC.balanceOf(signer0)).equal(mintingAmount*10n**decimals);
+  });
+  }) 
+  describe("Transfer", () => {
+  it("should have 0.5MT", async () => {
+    const signer0 = signers[0];
+    const signer1 = signers[1];
+    await expect(
+        myTokenC.transfer(
+            hre.ethers.parseUnits("0.5", decimals), 
+            signer1.address)
+        )
         .to.emit(myTokenC, "Transfer")
-        .withArgs(signer0.address, signer1.address, amount);
-
-      const bal0 = await myTokenC.balanceOf(signer0.address);
-      const bal1 = await myTokenC.balanceOf(signer1.address);
-
-      expect(bal1).to.equal(amount);
-      expect(bal0).to.equal(hre.ethers.parseUnits("100", decimals) - amount);
-
-      const remain = await myTokenC.allowance(signer0.address, signer1.address);
-      expect(remain).to.equal(0n);
-    });
+        .withArgs(
+            signer0.address,
+            signer1.address, 
+            hre.ethers.parseUnits("0.5",decimals)
+        );
+    expect(await myTokenC.balanceOf(signer1)).equal(
+        hre.ethers.parseUnits("0.5", decimals)
+    );
+});
+  it("it shoud be reverted with insufficient balance error", async () => {
+    const signer1 = signers[1];
+    await expect(
+     myTokenC.transfer(
+        hre.ethers.parseUnits((mintingAmount + 1n).toString(), decimals), signer1.address)
+    ).to.be.revertedWith("insufficient balance");
   });
 });
+describe("TransferFrom", () => {
+    it("should emit Approval event", async () => {
+      const signer1 = signers[1];
+      await expect(
+        myTokenC.approve(
+          signer1.address,
+          hre.ethers.parseUnits("10", decimals)
+        )
+      )
+        .to.emit(myTokenC, "Approval")
+        .withArgs(
+          signer1.address,
+          hre.ethers.parseUnits("10", decimals));
+    });
+    describe("TransferFrom", () => {
+        it("should emit Approval event", async () => {
+          const signer1 = signers[1];
+          await expect(
+            myTokenC.approve(
+              signer1.address,
+              hre.ethers.parseUnits("10", decimals)
+            )
+          )
+            .to.emit(myTokenC, "Approval")
+            .withArgs(
+              signer1.address,
+              hre.ethers.parseUnits("10", decimals));
+        });
+      });
+ });
+})
