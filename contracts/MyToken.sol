@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 contract MyToken {
     event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed spender, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
     string public name;
     string public symbol;
@@ -11,7 +11,7 @@ contract MyToken {
 
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => unit256)) allowance;
+    mapping(address => mapping(address => uint256)) public allowance;
 
     constructor(
         string memory _name,
@@ -27,24 +27,8 @@ contract MyToken {
     }
 
     function approve(address spender, uint256 amount) external {
-        allowance[msg.sender] [spender] = amount;
-        emit Approval(spender, amount);
-    }
-
-    function transferFrom(address from, address to, uint256 amount) external {
-        address spender = msg.sender;
-        require(allowance[from][spender] >= amount, "insufficient allowance");
-        allowance[from][spender] -= amount;
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-        emit Transfer(from, to, amount);
-    }
-
-    function _mint(uint256 amount, address owner) internal {
-        totalSupply += amount;
-        balanceOf[owner] += amount;
-        
-        emit Transfer(address(0), owner, amount);
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
     }
 
     function transfer(uint256 amount, address to) external {
@@ -55,5 +39,24 @@ contract MyToken {
 
         emit Transfer(msg.sender, to, amount);
     }
+
+    function transferFrom(address from, address to, uint256 amount) external {
+        address spender = msg.sender;
+
+        require(allowance[from][spender] >= amount, "insufficient allowance");
+        require(balanceOf[from] >= amount, "insufficient balance");
+
+        allowance[from][spender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+
+        emit Transfer(from, to, amount);
+    }
+
+    function _mint(uint256 amount, address owner) internal {
+        totalSupply += amount;
+        balanceOf[owner] += amount;
+
+        emit Transfer(address(0), owner, amount);
+    }
 }
- 
