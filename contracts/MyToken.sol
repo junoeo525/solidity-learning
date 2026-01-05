@@ -27,7 +27,7 @@ contract MyToken {
     }
 
     function approve(address spender, uint256 amount) external {
-        allowance[msg.sender] [spender] = amount;
+        allowance[msg.sender][spender] = amount;
         emit Approval(spender, amount);
     }
 
@@ -40,10 +40,14 @@ contract MyToken {
         emit Transfer(from, to, amount);
     }
 
+    function mint(uint256 amount, address owner) external {
+        _mint(amount, owner);
+    }
+
     function _mint(uint256 amount, address owner) internal {
         totalSupply += amount;
         balanceOf[owner] += amount;
-        
+
         emit Transfer(address(0), owner, amount);
     }
 
