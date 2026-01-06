@@ -1,84 +1,72 @@
-// staking
-// deposit(MyToken) / withdraw(MyToken)
-
-// MyToken : token balance management
-// - the balance of TinyBank address
-// TinyBank : deposit / withdraw vault
-// - users token management
-// - user --> deposit --> TinyBank --> transfer(user --> TinyBank)
-
-// Reward
-// - reward token : MyToken
-// - reward resources : 1 MT/block minting
-// - reward strategy : staked[user]/totalStaked distribution
-
-// - signer0 block 0 staking
-// - signer1 block 5 staking
-// - 0-- 1-- 2-- 3-- 4-- 5--
-// |
-// - signer0 10MT        signer1 10MT
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./ManagedAccess.sol";
+import "./MultiManagedAccess.sol";
 
 interface IMyToken {
     function transfer(uint256 amount, address to) external;
-
     function transferFrom(address from, address to, uint256 amount) external;
-
-    function mint(uint256 amount, address owner) external;
+    function mint(uint256 amount, address to) external;
 }
 
-contract TinyBank is ManagedAccess {
-    event Staked(address from, uint256 amount);
-    event Withdraw(uint256 amount, address to);
-
+contract TinyBank is MultiManagedAccess {
     IMyToken public stakingToken;
 
-    mapping(address => uint256) public lastClaimedBlock;
-    
-    uint256 defaultRewardPerBlock = 1 * 10 ** 18;
-    uint256 rewardPerBlock;
-
     mapping(address => uint256) public staked;
+    mapping(address => uint256) public lastClaimedBlock;
+
     uint256 public totalStaked;
+    uint256 public rewardPerBlock;
 
-    constructor(IMyToken _stakingToken) ManagedAccess(msg.sender, msg.sender) {
+    event Staked(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+
+    constructor(
+        IMyToken _stakingToken,
+        address[MANAGER_NUMBERS] memory _managers
+    ) MultiManagedAccess(msg.sender, _managers) {
         stakingToken = _stakingToken;
-        rewardPerBlock = defaultRewardPerBlock;
+        rewardPerBlock = 1 ether;
     }
 
-    // who, when?
-    // genesis staking
-    modifier updateReward(address to) {
-        if (staked[to] > 0) {
-            uint256 blocks = block.number - lastClaimedBlock[to];
-            uint256 reward = (blocks * rewardPerBlock * staked[to]) / totalStaked;
-            stakingToken.mint(reward, to);
+    modifier updateReward(address user) {
+        if (staked[user] > 0) {
+            uint256 blocksPassed = block.number - lastClaimedBlock[user];
+            uint256 reward = (blocksPassed * rewardPerBlock * staked[user]) / totalStaked;
+            stakingToken.mint(reward, user);
         }
-        lastClaimedBlock[to] = block.number;
-        _; //caller's code
+        lastClaimedBlock[user] = block.number;
+        _;
     }
 
-    function setRewardPerBlock (uint256 _amount) external onlyManager {
+    // 과제 포인트: onlyOwner 대신 onlyAllConfirmed 사용 + manager만 호출 가능
+    function setRewardPerBlock(uint256 _amount)
+        external
+        onlyManager
+        onlyAllConfirmed
+    {
         rewardPerBlock = _amount;
     }
 
-    function stake(uint256 _amount) external updateReward(msg.sender) {
-        require(_amount >= 0, "cannot stake 0 amount");
-        stakingToken.transferFrom(msg.sender, address(this), _amount);
-        staked[msg.sender] += _amount;
-        totalStaked += _amount;
-        emit Staked(msg.sender, _amount);
+    function stake(uint256 amount)
+        external
+        updateReward(msg.sender)
+    {
+        require(amount > 0, "cannot stake zero");
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        staked[msg.sender] += amount;
+        totalStaked += amount;
+        emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 _amount) external updateReward(msg.sender) {
-        require(staked[msg.sender] >= _amount, "insufficient staked token");
-        stakingToken.transfer(_amount, msg.sender);
-        staked[msg.sender] -= _amount;
-        totalStaked -= _amount;
-        emit Withdraw(_amount, msg.sender);
+    function withdraw(uint256 amount)
+        external
+        updateReward(msg.sender)
+    {
+        require(staked[msg.sender] >= amount, "insufficient stake");
+        staked[msg.sender] -= amount;
+        totalStaked -= amount;
+        stakingToken.transfer(amount, msg.sender);
+        emit Withdraw(msg.sender, amount);
     }
 }
