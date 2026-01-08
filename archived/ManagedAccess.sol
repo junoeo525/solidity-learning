@@ -1,3 +1,10 @@
+// Centralization vs Decentralization
+// a single DB    vs Distributed Ledger DB
+// a single BN    vs BN network
+
+// governance --> voting
+// A agenda --> by vote --> decision
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
